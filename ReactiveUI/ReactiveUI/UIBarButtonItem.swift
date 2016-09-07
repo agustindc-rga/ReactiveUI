@@ -10,73 +10,51 @@ import UIKit
 
 public extension UIBarButtonItem {
     
-    convenience init(barButtonSystemItem systemItem: UIBarButtonSystemItem, action: UIBarButtonItem -> ()) {
-        self.init(barButtonSystemItem: systemItem, target: nil, action: Selector())
+    convenience init(barButtonSystemItem systemItem: UIBarButtonSystemItem, action: @escaping (UIBarButtonItem) -> ()) {
+        self.init(barButtonSystemItem: systemItem, target: nil, action: nil)
         addAction(action)
     }
     
-    convenience init(title: String?, style: UIBarButtonItemStyle, action: UIBarButtonItem -> ()) {
-        self.init(title: title, style: style, target: nil, action: Selector())
+    convenience init(title: String?, style: UIBarButtonItemStyle, action: @escaping (UIBarButtonItem) -> ()) {
+        self.init(title: title, style: style, target: nil, action: nil)
         addAction(action)
     }
     
-    convenience init(image: UIImage?, style: UIBarButtonItemStyle, action: UIBarButtonItem -> ()) {
-        self.init(image: image, style: style, target: nil, action: Selector())
+    convenience init(image: UIImage?, style: UIBarButtonItemStyle, action: @escaping (UIBarButtonItem) -> ()) {
+        self.init(image: image, style: style, target: nil, action: nil)
         addAction(action)
     }
     
-    convenience init(image: UIImage?, landscapeImagePhone: UIImage?, style: UIBarButtonItemStyle, action: UIBarButtonItem -> ()) {
-        self.init(image: image, landscapeImagePhone: landscapeImagePhone, style: style, target: nil, action: Selector())
+    convenience init(image: UIImage?, landscapeImagePhone: UIImage?, style: UIBarButtonItemStyle, action: @escaping (UIBarButtonItem) -> ()) {
+        self.init(image: image, landscapeImagePhone: landscapeImagePhone, style: style, target: nil, action: nil)
         addAction(action)
     }
     
-    func addAction(action: UIBarButtonItem -> ()) {
+    func addAction(_ action: @escaping (UIBarButtonItem) -> ()) {
         removeAction()
         
-        proxyTarget = RUIBarButtonItemProxyTarget(action: action)
-        target = proxyTarget
-        self.action = RUIBarButtonItemProxyTarget.actionSelector()
+        proxyTarget = ProxyTarget(action: action)
+        self.target = proxyTarget
+        self.action = proxyTarget?.actionSelector()
     }
     
-    func removeAction() {
+    private func removeAction() {
+        proxyTarget = nil
         self.target = nil
         self.action = nil
     }
-    
 }
 
-internal extension UIBarButtonItem {
+internal extension UIBarButtonItem { 
     
-    typealias RUIBarButtonItemProxyTargets = [String: RUIBarButtonItemProxyTarget]
+    typealias ProxyTarget = RUIProxyTarget<UIBarButtonItem>
     
-    class RUIBarButtonItemProxyTarget: RUIProxyTarget {
-        var action: UIBarButtonItem -> ()
-        
-        init(action: UIBarButtonItem -> ()) {
-            self.action = action
-        }
-        
-        func performAction(control: UIBarButtonItem) {
-            action(control)
-        }
-    }
-    
-    var proxyTarget: RUIBarButtonItemProxyTarget {
+    var proxyTarget: ProxyTarget? {
         get {
-            if let targets = objc_getAssociatedObject(self, &RUIProxyTargetsKey) as? RUIBarButtonItemProxyTarget {
-                return targets
-            } else {
-                return setProxyTargets(RUIBarButtonItemProxyTarget(action: {_ in}))
-            }
+            return objc_getAssociatedObject(self, &RUIProxyTargetsKey) as? ProxyTarget
         }
         set {
-            setProxyTargets(newValue)
+            objc_setAssociatedObject(self, &RUIProxyTargetsKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
     }
-    
-    private func setProxyTargets(newValue: RUIBarButtonItemProxyTarget) -> RUIBarButtonItemProxyTarget {
-        objc_setAssociatedObject(self, &RUIProxyTargetsKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        return newValue
-    }
-    
 }

@@ -10,56 +10,37 @@ import UIKit
 
 public extension UIGestureRecognizer {
     
-    convenience init(action: UIGestureRecognizer -> ()) {
+    convenience init(action: @escaping (UIGestureRecognizer) -> ()) {
         self.init()
         addAction(action)
     }
 
-    func addAction(action: UIGestureRecognizer -> ()) {
+    func addAction(_ action: @escaping (UIGestureRecognizer) -> ()) {
         removeAction()
         
-        proxyTarget = RUIGestureRecognizerProxyTarget(action: action)
-        addTarget(proxyTarget, action: RUIGestureRecognizerProxyTarget.actionSelector())
+        let target = ProxyTarget(action: action)
+        addTarget(target, action: target.actionSelector())
+        proxyTarget = target
     }
     
     func removeAction() {
-        self.removeTarget(proxyTarget, action: RUIGestureRecognizerProxyTarget.actionSelector())
+        if let target = proxyTarget {
+            removeTarget(target, action: target.actionSelector())
+            proxyTarget = nil
+        }
     }
-    
 }
 
 internal extension UIGestureRecognizer {
+
+    typealias ProxyTarget = RUIProxyTarget<UIGestureRecognizer>
     
-    typealias RUIGestureRecognizerProxyTargets = [String: RUIGestureRecognizerProxyTarget]
-    
-    class RUIGestureRecognizerProxyTarget : RUIProxyTarget {
-        var action: UIGestureRecognizer -> ()
-        
-        init(action: UIGestureRecognizer -> ()) {
-            self.action = action
-        }
-        
-        func performAction(control: UIGestureRecognizer) {
-            action(control)
-        }
-    }
-    
-    var proxyTarget: RUIGestureRecognizerProxyTarget {
+    var proxyTarget: ProxyTarget? {
         get {
-            if let targets = objc_getAssociatedObject(self, &RUIProxyTargetsKey) as? RUIGestureRecognizerProxyTarget {
-                return targets
-            } else {
-                return setProxyTargets(RUIGestureRecognizerProxyTarget(action: {_ in}))
-            }
+            return objc_getAssociatedObject(self, &RUIProxyTargetsKey) as? ProxyTarget
         }
         set {
-            setProxyTargets(newValue)
+            objc_setAssociatedObject(self, &RUIProxyTargetsKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
     }
-    
-    private func setProxyTargets(newValue: RUIGestureRecognizerProxyTarget) -> RUIGestureRecognizerProxyTarget {
-        objc_setAssociatedObject(self, &RUIProxyTargetsKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        return newValue
-    }
-    
 }

@@ -8,53 +8,24 @@
 
 import UIKit
 
-public extension NSTimer {
-    
+public extension Timer {
     // Big thanks to https://github.com/ashfurrow/Haste
-    class func scheduledTimerWithTimeInterval(seconds: NSTimeInterval, action: NSTimer -> (), repeats: Bool) -> NSTimer {
-        return scheduledTimerWithTimeInterval(seconds, target: self, selector: "_timerDidFire:", userInfo: RUITimerProxyTarget(action: action), repeats: repeats)
+    class func scheduledTimer(timeInterval seconds: TimeInterval, action: @escaping (Timer) -> (), repeats: Bool) -> Timer {
+        return scheduledTimer(timeInterval: seconds, 
+                              target: self, 
+                              selector: #selector(_timerDidFire(_:)), 
+                              userInfo: ProxyTarget(action: action), 
+                              repeats: repeats)
     }
-    
 }
 
-internal extension NSTimer {
+internal extension Timer {
     
-    class func _timerDidFire(timer: NSTimer) {
-        if let proxyTarget = timer.userInfo as? RUITimerProxyTarget {
+    typealias ProxyTarget = RUIProxyTarget<Timer>
+    
+    class func _timerDidFire(_ timer: Timer) {
+        if let proxyTarget = timer.userInfo as? ProxyTarget {
             proxyTarget.performAction(timer)
         }
-    }
-    
-    typealias RUITimerProxyTargets = [String: RUITimerProxyTarget]
-    
-    class RUITimerProxyTarget : RUIProxyTarget {
-        var action: NSTimer -> ()
-        
-        init(action: NSTimer -> ()) {
-            self.action = action
-        }
-        
-        func performAction(control: NSTimer) {
-            action(control)
-        }
-    }
-    
-    var proxyTarget: RUITimerProxyTarget {
-        get {
-            if let targets = objc_getAssociatedObject(self, &RUIProxyTargetsKey) as? RUITimerProxyTarget {
-                return targets
-            } else {
-                return setProxyTargets(RUITimerProxyTarget(action: {_ in}))
-            }
-        }
-        set {
-            setProxyTargets(newValue)
-        }
-    }
-    
-    private func setProxyTargets(newValue: RUITimerProxyTarget) -> RUITimerProxyTarget {
-        objc_setAssociatedObject(self, &RUIProxyTargetsKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        return newValue
-    }
-    
+    }    
 }

@@ -10,81 +10,61 @@ import UIKit
 
 public extension UIControl {
     
-    convenience init(action: UIControl -> (), forControlEvents events: UIControlEvents) {
+    convenience init(action: @escaping (UIControl) -> (), forControlEvents events: UIControlEvents) {
         self.init()
         addAction(action, forControlEvents: events)
     }
 
-    convenience init(forControlEvents events: UIControlEvents, action: UIControl -> ()) {
+    convenience init(forControlEvents events: UIControlEvents, action: @escaping (UIControl) -> ()) {
         self.init()
         addAction(action, forControlEvents: events)
     }
     
-    func addAction(action: UIControl -> (), forControlEvents events: UIControlEvents) {
+    func addAction(_ action: @escaping (UIControl) -> (), forControlEvents events: UIControlEvents) {
         removeAction(forControlEvents: events)
 
-        let proxyTarget = RUIControlProxyTarget(action: action)
-        proxyTargets[keyForEvents(events)] = proxyTarget
-        addTarget(proxyTarget, action: RUIControlProxyTarget.actionSelector(), forControlEvents: events)
+        let proxyTarget = ProxyTargets.Target(action: action)
+        proxyTargets[events] = proxyTarget
+        addTarget(proxyTarget, action: proxyTarget.actionSelector(), for: events)
     }
     
-    func forControlEvents(events: UIControlEvents, addAction action: UIControl -> ()) {
+    func forControlEvents(_ events: UIControlEvents, addAction action: @escaping (UIControl) -> ()) {
         addAction(action, forControlEvents: events)
     }
 
     func removeAction(forControlEvents events: UIControlEvents) {
-        if let proxyTarget = proxyTargets[keyForEvents(events)] {
-            removeTarget(proxyTarget, action: RUIControlProxyTarget.actionSelector(), forControlEvents: events)
-            proxyTargets.removeValueForKey(keyForEvents(events))
+        if let proxyTarget = proxyTargets[events] {
+            removeTarget(proxyTarget, action: proxyTarget.actionSelector(), for: events)
+            proxyTargets[events] = nil
         }
     }
     
-    func actionForControlEvent(events: UIControlEvents) -> (UIControl -> ())? {
-        return proxyTargets[keyForEvents(events)]?.action
+    func actionForControlEvent(_ events: UIControlEvents) -> ((UIControl) -> ())? {
+        return proxyTargets[events]?.action
     }
     
-    var actions: [UIControl -> ()] {
-        return [RUIControlProxyTarget](proxyTargets.values).map({$0.action})
+    var actions: [(UIControl) -> ()] {
+        return proxyTargets.values.map { $0.action }
     }
-    
 }
 
 internal extension UIControl {
-
-    typealias RUIControlProxyTargets = [String: RUIControlProxyTarget]
     
-    class RUIControlProxyTarget : RUIProxyTarget {
-        var action: UIControl -> ()
-        
-        init(action: UIControl -> ()) {
-            self.action = action
-        }
-        
-        func performAction(control: UIControl) {
-            action(control)
-        }
-    }
+    typealias ProxyTargets = RUIProxyTargets<UIControl>    
     
-    func keyForEvents(events: UIControlEvents) -> String {
-        return "UIControlEvents: \(events.rawValue)"
-    }
-    
-    var proxyTargets: RUIControlProxyTargets {
+    var proxyTargets: ProxyTargets {
         get {
-            if let targets = objc_getAssociatedObject(self, &RUIProxyTargetsKey) as? RUIControlProxyTargets {
-                return targets
-            } else {
-                return setProxyTargets(RUIControlProxyTargets())
-            }
+            let targets = objc_getAssociatedObject(self, &RUIProxyTargetsKey) as? ProxyTargets
+            return targets ?? setProxyTargets(ProxyTargets())
         }
         set {
             setProxyTargets(newValue)
         }
     }
     
-    private func setProxyTargets(newValue: RUIControlProxyTargets) -> RUIControlProxyTargets {
+    @discardableResult
+    private func setProxyTargets(_ newValue: ProxyTargets) -> ProxyTargets {
         objc_setAssociatedObject(self, &RUIProxyTargetsKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return newValue
     }
-    
 }
